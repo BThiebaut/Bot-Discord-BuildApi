@@ -1,0 +1,6 @@
+{
+  "encryptionKey" : "YOURKEY",
+  "salt" : "YOURSALT",
+  "iv" : "YOURIV",
+  "token" : "YOURDISCORDBOTTOKEN"
+}

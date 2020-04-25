@@ -1,0 +1,22 @@
+{
+  "name": "bot-DRP",
+  "version": "1.0.0",
+  "description": "",
+  "main": "entry.js",
+  "dependencies": {
+    "crypto-js": "^4.0.0",
+    "discord.js": "^12.2.0",
+    "gulp-cli": "^2.2.0"
+  },
+  "devDependencies": {
+    "gulp": "^4.0.2"
+  },
+  "scripts": {
+    "start": "node entry.js",
+    "dev": "node --inspect entry.js",
+    "postinstall": "node ./npm-post-install.js"
+  },
+  "keywords": [],
+  "author": "BThiebaut",
+  "license": "GPLv3"
+}
