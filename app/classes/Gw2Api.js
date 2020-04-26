@@ -1,5 +1,9 @@
 const request = require('../Request');
 const EnumType = require('../EnumType');
+const fs = require('fs');
+const tempDir = "./files";
+const config = require('./../../conf.json');
+const CryptoJS = require('crypto-js');
 const Utils = require('../Utils');
 
 class Gw2Api {
@@ -71,7 +75,123 @@ class Gw2Api {
       console.error(err);
     })
   }
+
+  // DB SECTION //
+
   
+ _msgCache = "";
+
+  __getFileName(){
+      return tempDir + '/api.json';
+  }
+
+  _encrypt(data){
+    return CryptoJS.AES.encrypt(data, config.encryptionKey, {iv : config.iv});
+  }
+
+  _decrypt(data){
+    return CryptoJS.AES.decrypt(data, config.encryptionKey, {iv : config.iv});
+  }
+
+  _init() {
+      let fileName = _getFileName();
+      let initContent = {};
+
+      try {
+          if (!fs.existsSync(fileName)) {
+              console.log('Init : Création de  ' + fileName + '.')
+              let data = JSON.stringify(initContent);
+              fs.writeFileSync(fileName, this._encrypt(data));  
+          }else {
+              console.log('Init : le fichier ' + fileName + ' existe déjà.')
+          }
+      } catch(err) {
+          console.error(err)
+          throw err;
+      }
+  }
+
+  _getAll() {
+      try {
+          this._init();
+          let fileName = _getFileName();
+          let rawdata = fs.readFileSync(fileName);
+          return JSON.parse(this._decrypt(rawdata));
+      } catch(err) {
+          console.error(err)
+          throw 'Erreur : Impossible de récupérer le contenus du fichier de sauvegarde : ' + err;
+      }
+  }
+
+  _getByUser(user, name) {
+      try {
+          this._init();
+          let db = this._getAll();
+          return Utils.defined(db[user]) ? db[user] : null;
+      } catch (e) {
+          throw 'Impossible de récupérer les informations de ' + name + '. : ' + e;
+      } 
+  }
+
+  _getUserByName(name) {
+      try {
+          this._init();
+          let db = this._getAll();
+          let user = null;
+          if (Object.keys(db).length > 0){
+              for(entry in db){
+                  var data = db[entry];
+                  if (data.name.toLowerCase() == name.toLowerCase()){
+                      user = entry;
+                  }
+              }
+          }
+          return user;
+      } catch (e) {
+          throw 'Impossible de récupérer l\'utilisateur pour le nom ' + name + '. : ' + e;
+      } 
+  }
+
+  _writecontent() {
+      this._init();
+      try {
+          let fileName = _getFileName();
+          let data = JSON.stringify(content);
+          fs.writeFileSync(fileName, this._encrypt(data));  
+      } catch (err) {
+          throw "Erreur : impossible d'écrire : " + err;
+      }
+  }
+
+  _addToken(user, token) {
+      this._init();
+      let db = this._getAll();
+      let actual = this._getByUser(user);
+
+      db[user] = {
+          'name' : name,
+          'token' : token,
+      };
+
+      this._write(db);
+      msgCache += "Votre clé a bien été ajoutée";
+      return msgCache;
+  }
+
+  _remove(user, name) {
+      this._init();
+      let db = this._getAll();
+      let actual = this._getByUser(user);
+      if (actual === null){
+          throw "Vous n'existez pas dans ma base de donnée";
+      }
+
+      delete db[user];
+      this._write(db);
+      return "Je vous ai bien oublié.. Qui êtes vous ?";
+  }
+  
+  // END DB SECTION //
 }
 
 module.exports = Gw2Api;

@@ -1,9 +1,10 @@
-const db = require('../db/db');
+const db = require('../db/apidb');
 const Gw2Api = require('../classes/Gw2Api');
 const Gw2Build = require('../classes/Gw2Build');
 const EnumType = require('../EnumType');
 
 exports.run = (message, bot, args) => {
+    return;
     let addType = testAddType(args);
     if (EnumType.isApiType(addType)){
       if (message.channel.type != 'dm'){
