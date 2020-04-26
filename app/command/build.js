@@ -1,4 +1,3 @@
-const db = require('../db/apidb');
 const Gw2Build = require('../classes/Gw2Build');
 const EnumType = require('../EnumType');
 
@@ -14,14 +13,16 @@ exports.run = (message, bot, args) => {
           message.reply(datas);
           break;
         case EnumType.Type.TYPE_GET_BUILD:
-            message.reply({ embed : formatFindResults(gw2Build.name, datas) });
+            message.reply({ embed : formatFindResults(gw2Build, datas) });
           break;
       }
     }catch(e){
-      messages.reply(e);
+      if (typeof e == "string"){
+        message.reply(e);
+      }
+      console.error(e);
     }
   }else {
-    message.reply("arguments invalides");
     message.reply({ embed : exports.getEmbed() });
   }
 };
@@ -32,10 +33,7 @@ exports.getEmbed = () => {
     title : 'Usage de la commande !build',
     description : 
       "Permet l'ajout ou la récupération d'un build.\n"
-      +"Usage : !build buildName [buildUrl] [-remove|-f|-force]\n"
-      +"Ajout d'un build : !build Nom du build https://UrlDeMonBuild\n"
-      +"Récupération d'un build : !build Nom du build\n"
-      +"Supression d'un build : !build Nom du build -remove\n",
+      +"Usage : !build buildName [buildUrl] [-remove|-f|-force|-all]\n",
     fields : [
       {
         name : 'buildName',
@@ -45,26 +43,49 @@ exports.getEmbed = () => {
         name : 'buildUrl',
         value : 'Url du build si on souhaite l\'ajouter'
       },
+      {
+        name : 'Exemple : Ajout d\'un build',
+        value : '!build Nom du build https://UrlDeMonBuild'
+      },
+      {
+        name : 'Exemple : Récupération d\'un build',
+        value : '!build Nom du build'
+      },
+      {
+        name : 'Exemple : Supression d\'un build dont vous êtes l\'auteur',
+        value : '!build Nom du build -remove'
+      },
     ],
     timestamp: new Date(),
   }
 };
 
-function formatFindResults(query, datas){
+function formatFindResults(instance, datas){
+  let query = instance.name !== null ? instance.name : '';
   let color = 65280,
-      title = "Résultats de recherche",
-      description = "",
+      title = instance.mentions === null ? "Résultats de recherche" : "Résultats de recherche pour l'utilisateur " + instance.mentions.map(e => { return "<@" + e + ">" }).join(' ') ,
+      description = 'Affichage des résultats pour la recherche "'+ query +'"',
       fields = [],
       timestamp = new Date();
+  if (datas.length > 25){
+    // Embed limit to 25 fields
+    datas.length = 25;
+  }
   if (datas.length > 0){
-    for(data in datas){
+    for(let data in datas){
+      let entry = datas[data];
       fields.push({
-        name : data.name + ' (build de ' + data.author + ')',
-        value : data.url
+        name : entry.name + ' (ajouté par ' + entry.author + ')',
+        value : entry.url
       });
     }
   }else {
-    description = "Aucun résultat pour la recherche : "+ query;
+    if (query !== '-all'){
+      description = "Aucun résultat pour la recherche : "+ query;
+    }else {
+      description = "Aucun build n'a été enregistré pour le moment";
+    }
+    color = 16711680;
   }
 
   return {

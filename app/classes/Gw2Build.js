@@ -1,15 +1,16 @@
 const EnumType = require('../EnumType');
 const Utils = require('../Utils');
 const fs = require('fs');
-const dbDir = "../db";
+const dbDir = "/../db";
 
 class Gw2Build {
   static dbType = 'build';
   static addBuildRegex = /(.*)(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))/;
   static getBuildNameRegex = /(.*)(?:https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))/;
   static urlRegex = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))/g;
-  static getBuildRegex = /(.*) *(-remove|-f|-force)/i;
-  static optionsRegex = /(-force|-f|-remove)/ig;
+  static getBuildRegex = /(.*) *(-force|-f|-remove|-all)/i;
+  static optionsRegex = /(-force|-f|-remove|-all)/ig;
+  static mentionRegex = /<@!?\d+>/g;
 
   name       = null;
   url        = null;
@@ -17,19 +18,18 @@ class Gw2Build {
   options    = null;
   args       = null;
   typeAction = null;
+  mentions   = null;
 
   constructor(){
    }
 
   static testBuild(entry){
-    if (entry.match(this.addBuildRegex)){
+    if (entry.match(Gw2Build.addBuildRegex)){
       return EnumType.Type.TYPE_BUILD_VALID;
-    }else if (entry.match(this.getBuildRegex) && entry.indexOf('-remove') > -1) {
+    }else if (entry.match(Gw2Build.getBuildRegex) && entry.indexOf('-remove') > -1) {
       return EnumType.Type.TYPE_REMOVE_BUILD;
-    }else if (entry.match(this.getBuildRegex)) {
+    }else if (entry.match(Gw2Build.getBuildRegex) || entry) {
       return EnumType.Type.TYPE_GET_BUILD;
-    }else if (entry){
-      return EnumType.Type.TYPE_BUILD_INVALID;
     }
     return EnumType.Type.TYPE_NOT_BUILD;
   }
@@ -42,6 +42,7 @@ class Gw2Build {
     this.author = author;
     this._extractOptions();
     this._extractUrl();
+    this._extractMentions();
     this._extractName();
 
     let returnData = null;
@@ -77,14 +78,14 @@ class Gw2Build {
     if (this.author === null){
       throw "Erreur : auteur du build non fournis";
     }
-    return this._add(this.author, this.name, this.url);
+    return this._add(this.author, this.name, this.url, this._hasForce);
   }
 
   _getProcess(){
-    if (this.name === null){
+    if (this.name === null && !this._hasAll()){
       throw "Erreur : nom du build incorrect";
     }
-    return this._find(this.name);
+    return this._find(this.name, this._hasAll());
   }
 
   _removeProcess(){
@@ -105,7 +106,7 @@ class Gw2Build {
   }
 
   _extractOptions(){
-    this.options = this.args.match(optionsRegex);
+    this.options = this.args.match(Gw2Build.optionsRegex);
     if (this.options !== null && this.options.length > 0){
       this.options.forEach(element => {
         this.args = this.args.replace(element, '');
@@ -114,19 +115,34 @@ class Gw2Build {
   }
 
   _extractUrl(){
-    let url = this.args.match(urlRegex);
-    if (Utils.defined(url[0])){
+    let url = this.args.match(Gw2Build.urlRegex);
+    if (url !== null && Utils.defined(url[0])){
       this.url = url[0].trim();
       this.args = this.args.replace(this.url, '');
+      this.url = this._sanitize(this.url);
+    }
+  }
+
+  _extractMentions(){
+    let mentions = this.args.match(Gw2Build.mentionRegex);
+    if (mentions !== null && mentions.length > 0){
+      this.mentions = [];
+      mentions.forEach(element => {
+        this.args = this.args.replace(element, '');
+        let user = this._getUserFromMention(element);
+        if (user !== null){
+          this.mentions.push(user);
+        }
+      });
     }
   }
 
   _extractName(){
-    let name = this.args.match(getBuildNameRegex);
+    let name = this.args.match(Gw2Build.getBuildNameRegex);
     if (name !== null && Utils.defined(name[1])){
-      this.name = name[1].trim();
+      this.name = this._sanitize(name[1].trim());
     }else if (this.args){
-      this.name = this.args.trim();
+      this.name = this._sanitize(this.args.trim());
     }
   }
 
@@ -137,11 +153,28 @@ class Gw2Build {
   _hasRemove(){
     return this.options !== null && this.options.indexOf('-remove') > -1;
   }
+
+  _hasAll(){
+    return this.options !== null && this.options.indexOf('-all') > -1;
+  }
+
+  _sanitize(input){
+    return input.replace(/['";]/g, '');
+  }
+
+  _getUserFromMention(mention) {
+    const matches = mention.match(/^<@!?(\d+)>$/);
+    if (!matches) return;
+    const id = matches[1];
+    return client.users.cache.get(id);
+  }
+  
+
   // END SECTION PRIVATE //
 
   // SECTION DB //
   _getFileName(){
-    return dbDir + '/builds.json';
+    return __dirname + dbDir + '/builds.json';
   }
 
   _init(){
@@ -178,9 +211,9 @@ class Gw2Build {
         let db = this._getAll();
         let entries = Utils.defined(db[user]) ? db[user] : null;
         if (name){
-          for(entry in entries){
-            if (entry.name.toLowerCase() == name.toLowerCase()){
-              return entry;
+          for(let entry in entries){
+            if (entries[entry].name.toLowerCase() == name.toLowerCase()){
+              return entries[entry];
             }
           }
           return null;
@@ -198,9 +231,9 @@ class Gw2Build {
         let db = this._getAll();
         let entries = Utils.defined(db[user]) ? db[user] : null;
         if (name){
-          for(entry in entries){
-            if (entry.author.toLowerCase() == name.toLowerCase()){
-              return entry;
+          for(let entry in entries){
+            if (entries[entry].author.toLowerCase() == name.toLowerCase()){
+              return entries[entry];
             }
           }
           return null;
@@ -216,7 +249,19 @@ class Gw2Build {
     this._init();
     try {
         let fileName = this._getFileName();
-        let data = JSON.stringify(content);
+        let finalContent = {};
+        // Cleanup
+        for(let user in content) {
+          if (content[user] !== null){
+            finalContent[user] = [];
+            for(let entry in content[user]){
+              if (content[user][entry] !== null){
+                finalContent[user].push(content[user][entry]);
+              }
+            }
+          }
+        }
+        let data = JSON.stringify(finalContent);
         fs.writeFileSync(fileName, data);  
     } catch (err) {
         console.error(err);
@@ -242,7 +287,7 @@ class Gw2Build {
       db[userId] = [];
     }
 
-    db[user].push({
+    db[userId].push({
       name : build,
       url : url,
       author : author.username
@@ -253,35 +298,46 @@ class Gw2Build {
     return "Votre build a bien été ajouté";
   }
 
-  _remove(author, build){
-    this._init();
-    let db = this._getAll();
-    let actual = this._getByUser(author.id, build);
-    if (actual === null){
+  _remove(author, name){
+
+    try {
+        this._init();
+        let db = this._getAll();
+        let user = author.id;
+        let entries = Utils.defined(db[user]) ? db[user] : null;
+        for(let entry in entries){
+          if (entries[entry].name.toLowerCase() == name.toLowerCase()){
+            delete db[user][entry];
+            this._write(db);
+            return "Le build a bien été supprimé";
+          }
+        }
         throw "Imposssible de supprimer le build : il n'existe pas. Vérifiez que son nom soit correct.";
-    }
-    delete actual;
-    this._write(db);
-    return "Le build a bien été supprimé";
+    } catch (e) {
+        console.error(e);
+        throw 'Impossible de récupérer les informations de ' + name + '. : ' + e;
+    } 
   }
 
-  _find(build){
+  _find(build, all){
     this._init();
+    all = all === true;
     let db = this._getAll();
     let finded = [];
-    for(user in db){
-      for (entry in user){
-        if (this._compareString(entry.name, build)){
-          finded.push(entry);
+    build = this._sanitize('*'+build+'*');
+    for(let user in db){
+      if ( this.mentions === null || this.mentions.indexOf(user) > -1 ){
+        for(let entry in db[user]){
+          if (all || this._compareString(db[user][entry].name, build)){
+            finded.push(db[user][entry]);
+          }
         }
       }
     }
     return finded;
   }
+
   // END SECTION DB //
-
- 
-
 }
 
 
