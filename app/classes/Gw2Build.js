@@ -19,8 +19,10 @@ class Gw2Build {
   args       = null;
   typeAction = null;
   mentions   = null;
+  message    = null;
 
-  constructor(){
+  constructor(message){
+    this.message = message;
    }
 
   static testBuild(entry){
@@ -174,7 +176,8 @@ class Gw2Build {
 
   // SECTION DB //
   _getFileName(){
-    return __dirname + dbDir + '/builds.json';
+    let endFileName = this.message !== null && this.message.guild ? this.message.guild.id + '_builds.json' : 'builds.json'
+    return __dirname + dbDir + '/' + endFileName;
   }
 
   _init(){

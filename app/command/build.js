@@ -1,30 +1,42 @@
 const Gw2Build = require('../classes/Gw2Build');
 const EnumType = require('../EnumType');
 
+const deleteTimeout = 40000;
+
 exports.run = (message, bot, args) => {
     
   if (testAddType(args)){
     try {
-      let gw2Build = new Gw2Build();
+      let gw2Build = new Gw2Build(message);
       let datas = gw2Build.processBuild(message.author, args);
       switch(gw2Build.typeAction){
         case EnumType.Type.TYPE_BUILD_VALID:
         case EnumType.Type.TYPE_REMOVE_BUILD:
-          message.reply(datas);
+          message.reply(datas).then(msg=>{
+            msg.delete({ timeout : (deleteTimeout / 2) });
+          });
           break;
         case EnumType.Type.TYPE_GET_BUILD:
-            message.reply({ embed : formatFindResults(gw2Build, datas) });
+            message.reply({ embed : formatFindResults(gw2Build, datas) }).then(msg=>{
+              let time = parseInt(datas.length > 3 ? deleteTimeout * (datas.length / 2) : deleteTimeout);
+              msg.delete({ timeout : time });
+            });
           break;
       }
     }catch(e){
       if (typeof e == "string"){
-        message.reply(e);
+        message.reply(e).then(msg=>{
+          msg.delete({ timeout : deleteTimeout });
+        });
       }
       console.error(e);
     }
   }else {
-    message.reply({ embed : exports.getEmbed() });
+    message.reply({ embed : exports.getEmbed() }).then(msg=>{
+      msg.delete({ timeout : deleteTimeout*2 });
+    });
   }
+  message.delete();
 };
 
 exports.getEmbed = () => {
@@ -57,6 +69,9 @@ exports.getEmbed = () => {
       },
     ],
     timestamp: new Date(),
+    footer: {
+      text: "Ce message s'autodétruira dans " + ( (deleteTimeout*2) / 1000) + " secondes",
+    },
   }
 };
 
@@ -88,12 +103,17 @@ function formatFindResults(instance, datas){
     color = 16711680;
   }
 
+  let time = parseInt((datas.length > 3 ? deleteTimeout * (datas.length / 2) : deleteTimeout)) / 1000;
+
   return {
     color: color,
     title : title,
     description : description,
     fields : fields,
-    timestamp : timestamp
+    timestamp : timestamp,
+    footer: {
+      text: "Ce message s'autodétruira dans " + time + " secondes",
+    },
   };
 }
 
