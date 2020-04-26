@@ -49,10 +49,12 @@ exports.sendCommandLists = (message, source) => {
      let fields = [];
      let other = source == 'help' ? 'aide' : 'help';
      commands.forEach(element => {
-        fields.push({
-            name : element,
-            value : "Utilisez !" + element + " sans paramètres pour voir l'usage de cette commande"
-        });
+         if (element.substr(0, 1) !== '_'){
+             fields.push({
+                 name : element,
+                 value : "Utilisez !" + element + " sans paramètres pour voir l'usage de cette commande"
+             });
+         }
      });
     let embed = {
         color: 3447003,
